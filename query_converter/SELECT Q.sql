@@ -1,0 +1,1 @@
+SELECT Q.QuotationNumber FROM Quotation AS Q WITH(NOLOCK) JOIN [Status] AS S WITH(NOLOCK) ON Q.FK_Status = S.ID_Status AND S.Mode = 13 WHERE Q.Cancelled = 0;

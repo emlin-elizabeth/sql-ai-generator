@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Unapproved Questions</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        textarea { width: 100%; height: 80px; }
+        button { padding: 8px 12px; cursor: pointer; border: none; border-radius: 4px; }
+        .approve { background-color: #40e5c5; color: white; }
+        .delete { background-color: #024f40; color: white; }
+        .hidden { display: none; } /* ✅ Hide elements dynamically */
+    </style>
+</head>
+<body>
+
+  
+
+    <!-- ✅ "Review Unapproved Questions" button (Hidden initially) -->
+    <button id="reviewButton" class="hidden" onclick="window.location.href='/api/review_questions/'">
+        Review Unapproved Questions
+    </button>
+
+    <h2>Review Unapproved Questions</h2>
+    <table>
+        <tr>
+            <th>Question</th>
+            <th>Generated SQL Query</th>
+            <th>Actions</th>
+        </tr>
+        {% for question, sql_query in unapproved_questions.items %}
+        <tr>
+            <td>{{ question }}</td>
+            <td><textarea id="sql_{{ forloop.counter }}">{{ sql_query }}</textarea></td>
+            <td>
+                <button class="approve" onclick="approveQuestion('{{ question|escapejs }}', '{{ forloop.counter }}')">Approve</button>
+                <button class="delete" onclick="deleteQuestion('{{ question }}')">Delete</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <script>
+        document.getElementById("queryForm").onsubmit = async function(event) {
+            event.preventDefault();
+
+            let submitButton = document.querySelector("button[type='submit']");
+            submitButton.disabled = true;  // ✅ Prevent duplicate clicks
+
+            let queryInput = document.getElementById("query").value.trim();  // ✅ Trim spaces
+            let formData = new FormData();
+            formData.append("question", queryInput);
+
+            let response = await fetch("/api/generate_sql/", {
+                method: "POST",
+                body: formData
+            });
+
+            let result = await response.json();
+
+            if (result.sql_query) {
+                document.getElementById("result").textContent = result.sql_query.replace(/\\n/g, "\n");
+            } else {
+                document.getElementById("result").textContent = "Error: " + (result.error || "Unknown error");
+            }
+
+            // ✅ Show "Review Unapproved Questions" ONLY if it's a NEW question
+            if (result.is_new_question) {
+                document.getElementById("reviewButton").classList.remove("hidden");
+            }
+
+            setTimeout(() => {
+                submitButton.disabled = false;  // ✅ Re-enable after request finishes
+            }, 1000);
+        };
+
+        async function approveQuestion(question, index) {
+            const editedSQL = document.getElementById(`sql_${index}`).value;
+            let response = await fetch('/api/approve_question/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ question, sql_query: editedSQL })
+            });
+
+            let result = await response.json();
+            if (result.success) {
+                alert("Approved and saved successfully!");
+                location.reload();
+            } else {
+                alert("Error: " + result.error);
+            }
+        }
+
+        async function deleteQuestion(question) {
+            let response = await fetch('/api/delete_question/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ question })
+            });
+
+            let result = await response.json();
+            if (result.success) {
+                alert("Question deleted successfully!");
+                location.reload();
+            } else {
+                alert("Error: " + result.error);
+            }
+        }
+    </script>
+
+</body>
+</html>
